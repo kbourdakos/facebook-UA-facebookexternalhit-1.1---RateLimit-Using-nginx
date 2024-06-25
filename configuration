@@ -1,0 +1,36 @@
+# This part goes inside of nginx' http{} or you can include it using custom .conf file 
+# We'll adjust the rate limit to a conservative figure, say 5 requests per minute, and keep the burst allowance at 5 to accommodate short-term spikes in traffic.
+
+# map UA to key
+map $http_user_agent $limit_key {
+"~*facebookexternalhit" fbhit;
+default                 "";
+}
+
+# setting rate against the UA, telling ngxin to responde 429
+limit_req_zone $limit_key zone=fbhit:10m rate=5r/m;
+# return 429
+limit_req_status 429;
+
+
+# That part goes to vhost configuration. The sample is about location / {}
+limit_req zone=fbhit burst=5 nodelay;
+
+
+-- 
+Expected Behavior
+--
+  
+Request Handling: 
+Nginx will allow up to 5 requests per minute from the Facebook crawler. This means that within any given minute, if the crawler sends more than 5 requests, subsequent requests will be delayed until the next minute starts.
+
+Burst Handling: 
+With a burst allowance of 5, Nginx can temporarily accept up to 10 requests in a single minute (the base rate of 5 plus the burst allowance of 5).
+
+Response to Excess Traffic: 
+If the Facebook crawler exceeds the combined rate and burst limits (in this case, 10 requests in a single minute), Nginx will start to respond with HTTP status codes indicating that the request rate is too high.
+
+Effectiveness Against Overaggressive Crawling: 
+This configuration aims to reduce the impact of overly aggressive crawling by the Facebook crawler without completely blocking it.
+
+
