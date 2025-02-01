@@ -17,9 +17,9 @@ limit_req_status 429;
 limit_req zone=fbhit burst=5 nodelay;
 
 
------------------ 
-Expected Behavior
------------------
+-------------------
+#Expected Behavior#
+-------------------
   
 Request Handling: 
 Nginx will allow up to 5 requests per minute from the Facebook crawler. This means that within any given minute, if the crawler sends more than 5 requests, subsequent requests will be delayed until the next minute starts.
