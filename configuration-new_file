@@ -1,0 +1,75 @@
+# Nginx Rate Limiting for Facebook Crawler
+
+This configuration helps limit excessive requests from the Facebook crawler (`facebookexternalhit`) while allowing normal access.
+
+---
+
+## 1. Global HTTP Configuration
+
+Place this inside `http {}` in your main Nginx config or in a separate included `.conf` file:
+
+nginx
+# Map User-Agent to a rate-limiting key
+
+map $http_user_agent $limit_key {
+    "~*facebookexternalhit"  fbhit;  # Identify Facebook crawler
+    default                  "";     # No limit for other agents
+}
+
+# Define rate limit zone: 5 requests per minute with 10MB shared memory
+limit_req_zone $limit_key zone=fbhit:10m rate=5r/m;
+
+# Set default response for exceeding limit
+limit_req_status 429;
+
+**Notes:**
+
+* `$limit_key`: Associates the crawler with a specific rate limit.
+* `zone=fbhit:10m`: Creates a shared memory zone for tracking request rates (10MB is sufficient).
+* `rate=5r/m`: Allows 5 requests per minute per key.
+* `limit_req_status 429`: Returns HTTP 429 (Too Many Requests) when the limit is exceeded.
+
+---
+
+## 2. Virtual Host / Location Configuration
+
+Apply the rate limit inside your server block or specific location:
+
+```nginx
+server {
+    ...
+
+    location / {
+        # Apply rate limiting with burst allowance
+        limit_req zone=fbhit burst=5 nodelay;
+
+        ...
+    }
+
+    ...
+}
+```
+
+**Explanation:**
+
+* `burst=5`: Allows short-term spikes up to 5 additional requests.
+* `nodelay`: Enforces immediate limiting without delaying requests over the burst.
+
+---
+
+## 3. Expected Behavior
+
+| Feature                     | Behavior                                                                                           |
+| --------------------------- | -------------------------------------------------------------------------------------------------- |
+| **Request Handling**        | Up to 5 requests per minute are allowed for the Facebook crawler.                                  |
+| **Burst Handling**          | Nginx can accept an additional 5 requests in a short burst, allowing up to 10 requests per minute. |
+| **Excess Traffic Response** | Requests exceeding the combined rate + burst (10 requests/min) receive HTTP 429.                   |
+| **Purpose**                 | Reduces the impact of aggressive crawling without completely blocking the Facebook crawler.        |
+
+---
+
+### Tips & Best Practices
+
+1. Adjust `rate` and `burst` based on traffic patterns and server capacity.
+2. Use `map` for multiple bots or crawlers by adding additional keys.
+3. Monitor logs for HTTP 429 responses to fine-tune limits.  
